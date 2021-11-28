@@ -11,7 +11,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 /**
  * Retry utility for operations.
  * <p>
@@ -207,4 +213,27 @@ public class Retry<T> {
     }
 
     private static ExecutorService executorService = Executors.newFixedThreadPool(6);
+    
+    @Retention(RUNTIME)
+	@Target(METHOD)
+	public @interface RetryConfig {  
+		long maxOperationWaitTime() default 30_000;
+		long retryIntervalTime() default 0;
+		int maxRetryTimes() default 3;
+	}
+	public Retry<T> of(Method method,Object obj, Object... args) {
+		RetryConfig config=method.getAnnotation(RetryConfig.class); 
+		maxOperationWaitTime(config.maxOperationWaitTime());
+        retryIntervalTime(config.retryIntervalTime());
+        maxRetryTimes(config.maxRetryTimes());
+        return operation(() -> {  
+            try {
+				return (T)method.invoke(obj, args);
+			} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				throw new RuntimeException(e);
+			}
+        }); 
+	}
 }
